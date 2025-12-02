@@ -1,0 +1,30 @@
+{
+  "name": "figma-sync",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Figma와 Google Sheets 동기화 CLI 도구",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "server": "node server.js",
+    "dev": "nodemon index.js",
+    "dev:server": "nodemon server.js"
+  },
+  "keywords": [
+    "figma",
+    "google-sheets",
+    "sync"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "axios": "^1.6.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "express": "^4.22.1",
+    "googleapis": "^126.0.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.2"
+  }
+}

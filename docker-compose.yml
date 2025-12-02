@@ -1,0 +1,38 @@
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: figma-sync-server
+    restart: always
+    ports:
+      # TODO: 호스트 포트를 변경하려면 왼쪽 숫자 수정 (예: "5000:4000")
+      - "4000:4000"
+    env_file:
+      - .env
+    environment:
+      # 포트는 환경변수로도 설정 가능 (기본값: 4000)
+      - PORT=${PORT:-4000}
+      - NODE_ENV=production
+    volumes:
+      # 로그 디렉토리 마운트 (선택사항)
+      # TODO: NAS 경로를 실제 경로로 변경하세요
+      # - /volume1/docker/figma-sync/logs:/app/logs
+      
+      # 서비스 계정 JSON 파일이 필요한 경우 (GOOGLE_SERVICE_ACCOUNT_FILE 사용 시)
+      # TODO: service-account.json 파일이 있다면 주석 해제하고 경로 수정
+      # - /volume1/docker/figma-sync/service-account.json:/app/service-account.json:ro
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:4000/health', (r) => { process.exit(r.statusCode === 200 ? 0 : 1) })"]
+      interval: 30s
+      timeout: 10s
+      start_period: 40s
+      retries: 3
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+

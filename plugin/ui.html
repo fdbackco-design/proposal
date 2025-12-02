@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Figma Sheets Sync</title>
+  <style>
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      padding: 16px;
+      margin: 0;
+      background: #ffffff;
+    }
+    h1 {
+      font-size: 16px;
+      font-weight: 600;
+      margin: 0 0 16px 0;
+      color: #000000;
+    }
+    .form-group {
+      margin-bottom: 16px;
+    }
+    label {
+      display: block;
+      font-size: 12px;
+      font-weight: 500;
+      margin-bottom: 6px;
+      color: #333333;
+    }
+    input[type="text"] {
+      width: 100%;
+      padding: 8px 12px;
+      font-size: 12px;
+      border: 1px solid #e5e5e5;
+      border-radius: 6px;
+      box-sizing: border-box;
+      font-family: inherit;
+    }
+    input[type="text"]:focus {
+      outline: none;
+      border-color: #18a0fb;
+    }
+    button {
+      width: 100%;
+      padding: 10px 16px;
+      font-size: 13px;
+      font-weight: 500;
+      background: #18a0fb;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-family: inherit;
+      transition: background 0.2s;
+    }
+    button:hover {
+      background: #1592e6;
+    }
+    button:active {
+      background: #0e7bc4;
+    }
+    button:disabled {
+      background: #cccccc;
+      cursor: not-allowed;
+    }
+    .log-area {
+      margin-top: 16px;
+      padding: 12px;
+      background: #f5f5f5;
+      border-radius: 6px;
+      font-size: 11px;
+      font-family: 'Monaco', 'Menlo', 'Courier New', monospace;
+      max-height: 300px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+      color: #333333;
+      line-height: 1.5;
+    }
+    .log-entry {
+      margin-bottom: 4px;
+    }
+    .log-entry.success {
+      color: #0d7d3d;
+    }
+    .log-entry.error {
+      color: #d1242f;
+    }
+    .log-entry.info {
+      color: #333333;
+    }
+  </style>
+</head>
+<body>
+  <h1>Figma Sheets Sync</h1>
+  
+  <div class="form-group">
+    <label for="apiUrl">데이터 엔진 URL</label>
+    <input 
+      type="text" 
+      id="apiUrl" 
+      value="http://localhost:4000/figma-patches" 
+      placeholder="http://localhost:4000/figma-patches"
+    />
+  </div>
+  
+  <button id="applyBtn">패치 불러와서 적용</button>
+  
+  <div class="log-area" id="logArea"></div>
+
+  <script>
+    const apiUrlInput = document.getElementById('apiUrl');
+    const applyBtn = document.getElementById('applyBtn');
+    const logArea = document.getElementById('logArea');
+
+    function log(message, type = 'info') {
+      const entry = document.createElement('div');
+      entry.className = `log-entry ${type}`;
+      entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+      logArea.appendChild(entry);
+      logArea.scrollTop = logArea.scrollHeight;
+    }
+
+    function clearLog() {
+      logArea.innerHTML = '';
+    }
+
+    applyBtn.addEventListener('click', async () => {
+      const apiUrl = apiUrlInput.value.trim();
+      
+      if (!apiUrl) {
+        log('URL을 입력해주세요.', 'error');
+        return;
+      }
+
+      applyBtn.disabled = true;
+      clearLog();
+      log('패치 데이터를 가져오는 중...', 'info');
+
+      try {
+        // 데이터 엔진에서 패치 목록 가져오기
+        const response = await fetch(apiUrl);
+        
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+
+        const data = await response.json();
+
+        if (data.status !== 'ok') {
+          throw new Error(data.message || '알 수 없는 오류');
+        }
+
+        log(`✓ ${data.count}개의 패치를 받았습니다.`, 'success');
+        log('플러그인에 패치 전송 중...', 'info');
+
+        // 플러그인 메인 코드로 패치 전송
+        parent.postMessage(
+          {
+            pluginMessage: {
+              type: 'apply-patches',
+              patches: data.patches,
+            },
+          },
+          '*'
+        );
+
+        log('패치 전송 완료. 플러그인이 처리 중...', 'info');
+      } catch (error) {
+        log(`오류: ${error.message}`, 'error');
+        console.error('패치 가져오기 실패:', error);
+      } finally {
+        applyBtn.disabled = false;
+      }
+    });
+
+    // 플러그인 메인 코드로부터 메시지 수신
+    window.onmessage = (event) => {
+      const { type, text } = event.data.pluginMessage || {};
+      
+      if (type === 'log') {
+        log(text, 'info');
+      } else if (type === 'log-success') {
+        log(text, 'success');
+      } else if (type === 'log-error') {
+        log(text, 'error');
+      } else if (type === 'done') {
+        const { success, failed } = event.data.pluginMessage;
+        log('', 'info');
+        log(`=== 완료 ===`, 'info');
+        log(`성공: ${success}개`, 'success');
+        if (failed > 0) {
+          log(`실패: ${failed}개`, 'error');
+        }
+        applyBtn.disabled = false;
+      }
+    };
+  </script>
+</body>
+</html>
+

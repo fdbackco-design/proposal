@@ -1,0 +1,54 @@
+# Dependencies
+node_modules/
+npm-debug.log
+yarn-error.log
+package-lock.json
+
+# Environment files (will be mounted as volume or passed via env_file)
+.env
+.env.local
+.env.*.local
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*.sublime-*
+
+# OS
+.DS_Store
+Thumbs.db
+*.log
+
+# Documentation (optional - remove if you want docs in image)
+*.md
+!README.md
+
+# Plugin files (not needed in container)
+plugin/
+
+# Sample files
+*.sample.json
+*.example
+
+# Docker files
+Dockerfile
+.dockerignore
+docker-compose.yml
+docker-compose.*.yml
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
