@@ -16,18 +16,14 @@ FROM node:20-alpine
 
 WORKDIR /app
 
-# Create non-root user for security
-RUN addgroup -g 1000 appuser && \
-    adduser -D -u 1000 -G appuser appuser
-
 # Copy dependencies from builder
 COPY --from=builder /app/node_modules ./node_modules
 
 # Copy application code
-COPY --chown=appuser:appuser . .
+COPY . .
 
-# Switch to non-root user
-USER appuser
+# Use existing non-root user provided by node:20-alpine
+USER node
 
 # Expose port (default: 4000, can be overridden via PORT env var)
 EXPOSE 4000
