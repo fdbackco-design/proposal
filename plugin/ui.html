@@ -104,6 +104,18 @@
   </div>
   
   <button id="applyBtn">패치 불러와서 적용</button>
+
+  <div style="height: 12px;"></div>
+  
+  <div class="form-group">
+    <label for="ownerSelect">담당자 선택</label>
+    <select id="ownerSelect" style="width:100%; padding:8px 12px; font-size:12px; border:1px solid #e5e5e5; border-radius:6px; font-family:inherit;">
+      <option value="손성훈">손성훈</option>
+      <option value="안성준">안성준</option>
+      <option value="정성은">정성은</option>
+      <option value="김남형">김남형</option>
+    </select>
+  </div>
   <button id="exportPdfBtn" style="margin-top:8px;">매치된 프레임 PDF 생성</button>
   <div class="log-area" id="logArea"></div>
 
@@ -111,10 +123,18 @@
     const apiUrlInput = document.getElementById('apiUrl');
     const applyBtn = document.getElementById('applyBtn');
     const exportPdfBtn = document.getElementById('exportPdfBtn');
+    const ownerSelect = document.getElementById('ownerSelect');
     const logArea = document.getElementById('logArea');
  
     let matchedFrameIds = [];
     let currentFileKey = null;
+
+    const BACK_COVER_NAME_BY_OWNER = {
+      '손성훈': '0-11',
+      '안성준': '0-12',
+      '정성은': '0-13',
+      '김남형': '0-14',
+    };
 
     function log(message, type = 'info') {
       const entry = document.createElement('div');
@@ -204,9 +224,15 @@
           frameIds: matchedFrameIds,
         };
 
-        // fileKey를 백엔드에서 요구한다면 같이 넘김
         if (currentFileKey) {
           payload.fileKey = currentFileKey;
+        }
+
+        // ★ 선택된 담당자에 따라 뒷표지 프레임 이름 결정
+        const owner = ownerSelect.value;
+        const backFrameName = BACK_COVER_NAME_BY_OWNER[owner] || null;
+        if (backFrameName) {
+          payload.backFrameName = backFrameName;
         }
 
         const resp = await fetch(exportUrl, {

@@ -13,23 +13,41 @@ import { config } from './config.js';
 // 표지 / 목차 / 뒷표지 프레임 이름 (Figma 프레임의 name 값)
 const COVER_FRAME_NAME = '0-0';   // 표지
 const TOC_FRAME_NAME   = '0-1';   // 목차
-const BACK_FRAME_NAME  = '0-11';  // 뒷표지
 
 const app = express();
 const PORT = process.env.PORT || 4000;
 
+// 🔹 Figma에서만 credential 허용할 Origin 목록
+const ALLOWED_ORIGINS = [
+  'https://www.figma.com',
+  // 데스크톱/샌드박스 환경 대비 여유로 추가 (필요 없으면 빼도 됨)
+  'https://www.figma.com/plugin-sandbox'
+];
+
 // CORS 설정: Figma Plugin UI가 이 서버에서 데이터를 가져올 수 있도록
 app.use((req, res, next) => {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  const origin = req.headers.origin;
+
+  if (origin && ALLOWED_ORIGINS.includes(origin)) {
+    // Figma에서 올 때만 명시 Origin + Credentials 허용
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+  } else {
+    // 그 외 환경(테스트용 등)은 그냥 전체 오픈 (Credentials 없음)
+    res.setHeader('Access-Control-Allow-Origin', '*');
+  }
+
   res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type,Authorization');
-  
-  // OPTIONS 요청 처리
+  // Origin에 따라 응답이 달라지므로 캐시 분리
+  res.setHeader('Vary', 'Origin');
+
+  // OPTIONS preflight 처리
   if (req.method === 'OPTIONS') {
     res.sendStatus(200);
     return;
   }
-  
+
   next();
 });
 
@@ -125,7 +143,7 @@ app.post('/figma-export-pdf', async (req, res) => {
     console.log('[POST /figma-export-pdf] 요청 받음');
     console.log('  → body:', req.body);
 
-    const { fileKey, frameIds } = req.body;
+    const { fileKey, frameIds, backFrameName } = req.body;
     const finalFileKey = fileKey || config.figmaFileKey;
 
     // 입력 검증
@@ -136,22 +154,27 @@ app.post('/figma-export-pdf', async (req, res) => {
     }
 
     console.log(`  → (상품) ${frameIds.length}개의 프레임을 PDF로 변환할 예정입니다.`);
+    console.log('  → 선택된 뒷표지 프레임 이름:', backFrameName);
 
     // ----------------------------------------------------
-    // 1) Figma 파일에서 "0-0, 0-1, 0-11" 프레임 ID 찾기
+    // 1) Figma 파일에서 표지/목차/뒷표지 프레임 ID 찾기
     // ----------------------------------------------------
     console.log('  → Figma 파일에서 표지/목차/뒷표지 프레임 검색 중...');
     const fileJson = await fetchFigmaFile();
     const frames = getFrames(fileJson);
 
     function findFrameIdByName(name) {
+      if (!name) return null;
       const f = frames.find((fr) => fr.name.trim() === name);
       return f ? f.id : null;
     }
 
     const coverId = findFrameIdByName(COVER_FRAME_NAME);
     const tocId   = findFrameIdByName(TOC_FRAME_NAME);
-    const backId  = findFrameIdByName(BACK_FRAME_NAME);
+
+    // backFrameName이 없으면 기본값 '0-11' 사용
+    const backName = backFrameName || '0-11';
+    const backId   = findFrameIdByName(backName);
 
     if (!coverId) {
       console.warn(`  ⚠ 표지 프레임("${COVER_FRAME_NAME}")을 찾지 못했습니다.`);
@@ -160,7 +183,7 @@ app.post('/figma-export-pdf', async (req, res) => {
       console.warn(`  ⚠ 목차 프레임("${TOC_FRAME_NAME}")을 찾지 못했습니다.`);
     }
     if (!backId) {
-      console.warn(`  ⚠ 뒷표지 프레임("${BACK_FRAME_NAME}")을 찾지 못했습니다.`);
+      console.warn(`  ⚠ 뒷표지 프레임("${backName}")을 찾지 못했습니다.`);
     }
 
     // ----------------------------------------------------
@@ -172,14 +195,13 @@ app.post('/figma-export-pdf', async (req, res) => {
     if (coverId) orderedIds.push(coverId);
     if (tocId)   orderedIds.push(tocId);
 
-    // 상품 frameIds 추가 (이미 표지/목차 ID가 들어있어도 filter로 중복 제거 가능)
     for (const id of frameIds) {
       orderedIds.push(id);
     }
 
     if (backId) orderedIds.push(backId);
 
-    // 혹시 중복이 있다면 Set으로 한 번 정리
+    // 중복 제거
     const finalFrameIds = Array.from(new Set(orderedIds));
 
     console.log('  → 최종 PDF 병합 순서:', finalFrameIds);
