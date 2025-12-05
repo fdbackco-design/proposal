@@ -96,24 +96,59 @@ app.get('/figma-patches', async (req, res) => {
     const frames = getFrames(fileJson);
     console.log(`  ✓ ${frames.length}개의 프레임을 찾았습니다.`);
 
-    // 4) 패치 생성
+    // 🔹 3-1. 시트 순서 맵 만들기 (productName → index)
+    const sheetOrderMap = new Map();
+    let order = 0;
+    for (const key of Object.keys(sheetMap)) {
+      sheetOrderMap.set(key.trim(), order++);
+    }
+
+    // 🔹 3-2. 시트와 매칭되는 프레임만 골라서, 시트 순서 인덱스 부여
+    const matchedMeta = []; // { id, name, sheetIndex }
+    for (const frame of frames) {
+      const frameName = frame.name.trim();
+      const row = sheetMap[frameName];
+
+      if (!row) continue; // 시트에 없는 프레임은 패스
+
+      const sheetIndex =
+        sheetOrderMap.has(frameName)
+          ? sheetOrderMap.get(frameName)
+          : Number.MAX_SAFE_INTEGER;
+
+      matchedMeta.push({
+        id: frame.id,
+        name: frameName,
+        sheetIndex,
+      });
+    }
+
+    // 🔹 3-3. 시트 순서대로 정렬
+    matchedMeta.sort((a, b) => a.sheetIndex - b.sheetIndex);
+
+    // 🔹 3-4. 최종 matchedFrameIds = 시트 순서대로 정렬된 프레임 ID
+    const matchedFrameIds = matchedMeta.map((m) => m.id);
+    console.log(`  ✓ 시트와 매칭된 프레임: ${matchedFrameIds.length}개`);
+
+    // 4) 패치 생성 (기존 로직 그대로 사용, matchedFrameIds는 여기 계산한 것을 사용)
     console.log('  → 패치 생성 중...');
-    const { patches, matchedFrameIds } = buildNodePatches(frames, sheetMap);
+    const { patches } = buildNodePatches(frames, sheetMap);
     console.log(`  ✓ ${patches.length}개의 텍스트 패치를 생성했습니다.`);
-    console.log(`  ✓ ${matchedFrameIds.length}개의 프레임이 매칭되었습니다.`);
 
     // 5) 응답 반환
     res.json({
       status: 'ok',
       count: patches.length,
       patches,
-      matchedFrameIds,
+      matchedFrameIds,           // 🔹 여기! 우리가 직접 계산한 값
       totalFrames: frames.length,
       matchedCount: matchedFrameIds.length,
       fileKey: config.figmaFileKey,
     });
 
-    console.log(`[GET /figma-patches] 성공: ${patches.length}개 패치, ${matchedFrameIds.length}개 매칭 프레임 반환`);
+    console.log(
+      `[GET /figma-patches] 성공: ${patches.length}개 패치, ${matchedFrameIds.length}개 매칭 프레임 반환`
+    );
   } catch (err) {
     console.error('[GET /figma-patches] 오류:', err);
     res.status(500).json({
