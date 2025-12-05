@@ -22,7 +22,8 @@
     "cors": "^2.8.5",
     "dotenv": "^16.3.1",
     "express": "^4.22.1",
-    "googleapis": "^126.0.0"
+    "googleapis": "^126.0.0",
+    "pdf-lib": "^1.17.1"
   },
   "devDependencies": {
     "nodemon": "^3.0.2"

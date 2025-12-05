@@ -120,12 +120,15 @@ export function getFrames(fileJson) {
  * 
  * @param {Array<{id: string, name: string, node: Object}>} frames - getFrames()의 반환값
  * @param {Object} sheetMap - getSheetMap()의 반환값 (product_name을 키로 하는 맵)
- * @returns {Array<{nodeId: string, frameName: string, layerName: string, newText: string}>} 패치 배열
+ * @returns {{patches: Array<{nodeId: string, frameName: string, layerName: string, newText: string}>, matchedFrameIds: string[]}} 패치 배열과 매칭된 프레임 ID 배열
  */
 export function buildNodePatches(frames, sheetMap) {
   const patches = [];
 
-  // 텍스트 노드 이름 → 시트 필드명 매핑
+  // 최종 반환용: 시트 순서 기준으로 정렬된 프레임 ID
+  let matchedFrameIds = [];
+
+  // 🔹 텍스트 노드 이름 → 시트 필드명 매핑
   const FIELD_MAP = {
     '#product_name': 'productName',
     '#shipping_fee': 'shippingFee',
@@ -134,30 +137,46 @@ export function buildNodePatches(frames, sheetMap) {
     '#online_price': 'onlinePrice',
   };
 
+  // 🔹 1) 시트 순서 맵 만들기 (productName → index)
+  //    Object.keys(sheetMap)는 getSheetMap에서 넣은 순서 (즉, 시트 위에서 아래 순서)를 유지함
+  const sheetOrderMap = new Map();
+  let order = 0;
+  for (const key of Object.keys(sheetMap)) {
+    sheetOrderMap.set(key.trim(), order++);
+  }
+
+  // 🔹 2) 프레임 ↔ 시트 매칭하면서, 시트 인덱스 메타 정보 수집
+  const matchedMeta = []; // { frameId, frameName, sheetIndex }
+
   for (const frame of frames) {
     const frameName = frame.name.trim();
     const row = sheetMap[frameName];
 
     // 시트에 해당 제품명이 없으면 경고하고 건너뛰기
     if (!row) {
-      console.warn(`[SKIP] 프레임 "${frameName}"에 해당하는 시트 데이터를 찾을 수 없습니다.`);
+      console.warn(
+        `[SKIP] 프레임 "${frameName}"에 해당하는 시트 데이터를 찾을 수 없습니다.`
+      );
       continue;
     }
 
-    // 매칭 성공 로그
-    console.log(`[MATCH] 프레임 "${frameName}" ↔ 시트 행 (${row.company})`);
+    // 시트 내 순서 인덱스
+    const sheetIndex =
+      sheetOrderMap.get(frameName) ?? Number.MAX_SAFE_INTEGER;
 
-    // 프레임 내부를 DFS로 순회하며 텍스트 노드 찾기
+    // 매칭 성공 로그
+    console.log(
+      `[MATCH] 프레임 "${frameName}" ↔ 시트 행 (company=${row.company}, index=${sheetIndex})`
+    );
+
+    // 🔹 패치 생성 (기존 로직 그대로)
     walkNodes(frame.node, (node) => {
-      // TEXT 타입 노드만 확인
       if (node.type !== 'TEXT') return;
 
-      // 노드 이름이 매핑에 있는지 확인
       const layerName = node.name;
       const fieldName = FIELD_MAP[layerName];
 
       if (fieldName && row[fieldName] !== undefined) {
-        // 패치 추가
         patches.push({
           nodeId: node.id,
           frameName: frameName,
@@ -166,9 +185,22 @@ export function buildNodePatches(frames, sheetMap) {
         });
       }
     });
+
+    // 🔹 매칭된 프레임 메타 저장 (나중에 정렬용)
+    matchedMeta.push({
+      frameId: frame.id,
+      frameName,
+      sheetIndex,
+    });
   }
 
-  return patches;
+  // 🔹 3) 시트 순서(sheetIndex) 기준으로 정렬
+  matchedMeta.sort((a, b) => a.sheetIndex - b.sheetIndex);
+
+  // 🔹 4) 최종 matchedFrameIds는 "시트 순서대로" 정렬된 frameId 배열
+  matchedFrameIds = matchedMeta.map((m) => m.frameId);
+
+  return { patches, matchedFrameIds };
 }
 
 /**

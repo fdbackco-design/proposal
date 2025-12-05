@@ -7,10 +7,12 @@
   "editorType": ["figma"],
   "networkAccess": {
     "allowedDomains": [
-      "https://feedholdings.synology.me:4443"
+      "https://feedholdings.synology.me:4443",
+      "http://localhost:4000"
     ],
     "devAllowedDomains": [
-      "https://feedholdings.synology.me:4443"
+      "https://feedholdings.synology.me:4443",
+      "http://localhost:4000"
     ],
     "reasoning": "사무실 NAS에서 HTTPS로 노출된 데이터 서버에만 접속하기 위함입니다."
   }
